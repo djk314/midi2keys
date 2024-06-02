@@ -13,5 +13,8 @@ midi_note_to_shortcut = {
 
     # Add mappings here
 }
-
+these configs can be added in two separate files named mappings.
+Default midi port is X-Touch INT can be changed in python file or in interface if the 
+interface start (if no port it crash).
+To start click on Start Midi Listening, can be stopped too.
 That's all for now it work fine for me.
