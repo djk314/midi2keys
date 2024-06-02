@@ -1,0 +1,7 @@
+(60, 1): [Key.shift, Key.right]
+(60, 65): [Key.shift, Key.left]
+61: [Key.ctrl, 'c']
+62: [Key.ctrl, 'v']
+
+
+

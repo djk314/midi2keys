@@ -1,11 +1,13 @@
+import json
+import os
 import mido
+from tkinter import Tk, Label, Button, Entry, StringVar, OptionMenu
 from pynput.keyboard import Controller, Key
 
-# init keyboard control
+# Initialize the keyboard controller
 keyboard = Controller()
 
-# # Dictionary to map number to notes
-
+# Default dictionary to map notes to MIDI numbers
 note_to_midi = {
     'C0': 12, 'C#0': 13, 'D0': 14, 'D#0': 15, 'E0': 16, 'F0': 17, 'F#0': 18, 'G0': 19, 'G#0': 20, 'A0': 21, 'A#0': 22, 'B0': 23,
     'C1': 24, 'C#1': 25, 'D1': 26, 'D#1': 27, 'E1': 28, 'F1': 29, 'F#1': 30, 'G1': 31, 'G#1': 32, 'A1': 33, 'A#1': 34, 'B1': 35,
@@ -16,33 +18,35 @@ note_to_midi = {
     'C6': 84, 'C#6': 85, 'D6': 86, 'D#6': 87, 'E6': 88, 'F6': 89, 'F#6': 90, 'G6': 91, 'G#6': 92, 'A6': 93, 'A#6': 94, 'B6': 95,
     'C7': 96, 'C#7': 97, 'D7': 98, 'D#7': 99, 'E7': 100, 'F7': 101, 'F#7': 102, 'G7': 103, 'G#7': 104, 'A7': 105, 'A#7': 106, 'B7': 107,
     'C8': 108
-}
+    }
+# Charger les données depuis le fichier de configuration
+def load_config(filename):
+    config = {}
+    with open(filename, 'r') as file:
+        for line in file:
+            line = line.strip()
+            if line:
+                key, value = line.split(':')
+                key = key.strip()
+                value = value.strip()
+                # Convertir la clé et la valeur en Python types
+                key = eval(key)
+                value = eval(value)
+                config[key] = value
+    return config
 
-# map Control Change (CC) numbers to keyboard shortcuts
-midi_to_shortcut = {
-    (60, 1): [Key.shift, Key.right],  # Shift + Right Arrow jog right valeur 1
-    (60, 65): [Key.shift, Key.left],  # Shift + Left Arrow jog left valeur 65
-    61: [Key.ctrl, 'c'],         # Ctrl + C (copier) pour toutes les valeurs
-    62: [Key.ctrl, 'v'],         # Ctrl + V (coller) pour toutes les valeurs
-    # Add mappings here
-}
 
-  # midi notes
-midi_note_to_shortcut = {
-    ('D#7', 127): [')'],  # Shift + Right Arrow pour Note C5 avec vélocité 127
-    ('D7', 127): ['-'],         # Ctrl + C pour Note C#5 avec vélocité 127
-    ('A#2', 127): ['i'],         # Ctrl + C pour Note C#5 avec vélocité 127
-    ('B2', 127): ['o'],         # Ctrl + C pour Note C#5 avec vélocité 127
-    ('C3', 127): ['p'],         # Ctrl + C pour Note C#5 avec vélocité 127
-    ('A6', 127): ['j'],         # stop buton C#5 avec vélocité 127
-    ('A#6', 127): [Key.alt, 'e'],         # play buton C#5 avec vélocité 127
-    ('G#6', 127): ['r'],         # ff buton C#5 avec vélocité 127
-    ('G6', 127): ['a'],         # rff buton C#5 avec vélocité 127
+# Utiliser la fonction pour charger les données
+mappings_notes = load_config('mappings_notes.txt')
+mappings_controls = load_config('mappings_controls.txt')
 
-    ('D5', 127): [Key.ctrl, 'v'],         # Ctrl + V pour Note D5 avec vélocité 127
-    # Add mappings here
-}
+# Afficher les données
 
+midi_to_shortcut = mappings_controls
+midi_note_to_shortcut = mappings_notes
+
+
+# Handle incoming MIDI messages
 def on_midi_message(message):
     if message.type == 'control_change':
         control_number = message.control
@@ -50,7 +54,7 @@ def on_midi_message(message):
         print(f"Received Control Change: Control {control_number}, Value {value}")
         key_combination = midi_to_shortcut.get((control_number, value)) or midi_to_shortcut.get(control_number)
         if key_combination:
-            # simulated key shortcuts
+            # Simulate key shortcuts
             for key in key_combination:
                 keyboard.press(key)
             for key in reversed(key_combination):
@@ -63,33 +67,48 @@ def on_midi_message(message):
         print(f"Received {message.type}: Note {note_name} ({note}), Velocity {velocity}")
         key_combination = midi_note_to_shortcut.get((note_name, velocity))
         if key_combination:
-            # Simulated key shortcuts
+            # Simulate key shortcuts
             for key in key_combination:
                 keyboard.press(key)
             for key in reversed(key_combination):
                 keyboard.release(key)
             print(f"Shortcut {key_combination} executed for Note {note_name} with velocity of {velocity}.")
 
-# default midi port
+# Default MIDI port
 default_port = 'X-Touch INT'
 
-# List  Midi ports MIDI
-print("MIDI ports available:")
-ports = mido.get_input_names()
-for port in ports:
-    print(port)
+class MidiToKeyApp:
+    def __init__(self, master):
+        self.master = master
+        self.master.title("MIDI to Key Mapper")
 
-# check if default port aiviable
-if default_port in ports:
-    selected_port = default_port
-else:
-    # if not select other port
-    selected_port = input("Select a MIDI port: ")
+        # MIDI port selector
+        Label(master, text="Select MIDI Port:").pack()
+        self.selected_port = StringVar(master)
+        self.selected_port.set("X-Touch INT")
+        self.midi_ports = mido.get_input_names()
+        OptionMenu(master, self.selected_port, *self.midi_ports).pack()
 
-# open selected port
-with mido.open_input(selected_port) as inport:
-    print(f"MIDI port used: {selected_port}")
-    print("wait for MIDI message...")
-    for message in inport:
-        print(f"Midi Message received: {message}")
-        on_midi_message(message)
+        # Start MIDI Listening Button
+        Button(master, text="Start MIDI Listening", command=self.start_midi_listening).pack()
+        #Bouton pour arrêter l'écoute MIDI
+        Button(master, text="Stop MIDI Listening", command=self.stop_midi_listening).pack()
+    def start_midi_listening(self):
+        port_name = self.selected_port.get()
+        if port_name == "Select MIDI Port":
+            print("Please select a valid MIDI port.")
+            return
+        self.midi_in = mido.open_input(port_name, callback=on_midi_message)
+        print(f"Started listening on {port_name}")
+        
+    def stop_midi_listening(self):
+        if self.midi_in:
+            self.midi_in.close()  # Fermer le port MIDI
+            print("Stopped MIDI Listening")
+        else:
+            print("MIDI Listening not started yet or already stopped")
+
+if __name__ == "__main__":
+    root = Tk()
+    app = MidiToKeyApp(root)
+    root.mainloop()
